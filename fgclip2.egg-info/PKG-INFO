@@ -1,4 +1,21 @@
-[**中文说明**](README.md) | [**English**](README_en.md)
+Metadata-Version: 2.4
+Name: fgclip2
+Version: 1.1.1
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: torch
+Requires-Dist: torchvision
+Requires-Dist: transformers
+Requires-Dist: datasets
+Requires-Dist: accelerate
+Requires-Dist: deepspeed
+Requires-Dist: wandb
+Dynamic: license-file
+
+[**English**](README.md)
 
 # FG-CLIP 2: A Bilingual Fine-grained Vision-language Alignment Model
 
@@ -116,18 +133,17 @@ cd FG-CLIP && pip install -e .
 ### Load Model
 ```Shell
 import torch
-from PIL import Image
-from transformers import (
-    AutoImageProcessor,
-    AutoTokenizer,
-    AutoModelForCausalLM,
-)
-
+from transformers import AutoImageProcessor, AutoTokenizer, AutoModelForCausalLM
 
 model_root = "fgclip2-base-patch16"
-model = AutoModelForCausalLM.from_pretrained(model_root,trust_remote_code=True).cuda()
+model = AutoModelForCausalLM.from_pretrained(model_root, trust_remote_code=True)
 
-device = model.device
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+model = model.to(device)
 
 tokenizer = AutoTokenizer.from_pretrained(model_root)
 image_processor = AutoImageProcessor.from_pretrained(model_root)
