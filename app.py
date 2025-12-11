@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -10,6 +10,8 @@ import tempfile
 import os
 import logging
 from pathlib import Path
+import json
+from requirement_checker import check_video_requirements
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -146,6 +148,44 @@ async def compare_videos(video1: UploadFile = File(...), video2: UploadFile = Fi
             try:
                 if os.path.exists(tmp_file):
                     os.unlink(tmp_file)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {tmp_file}: {e}")
+
+
+@app.post("/validate")
+async def validate_video_requirements(
+    video: UploadFile = File(...),
+    requirements_json: str = Form(...),
+    num_frames: int = Form(8)
+):
+    """
+    Run LLaVA-based requirement checks on a video before duplicate detection.
+    `requirements_json` should be a JSON string representing the requirements dict.
+    """
+    tmp_file = None
+    try:
+        try:
+            requirements = json.loads(requirements_json)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid requirements JSON: {e}")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+            content = await video.read()
+            tmp.write(content)
+            tmp_file = tmp.name
+
+        logger.info(f"Validating requirements for video: {tmp_file}")
+        result = check_video_requirements(tmp_file, requirements, num_frames=num_frames)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating video: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if tmp_file and os.path.exists(tmp_file):
+            try:
+                os.unlink(tmp_file)
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {tmp_file}: {e}")
 
